@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Finanzas"/>
+  <title>Finanzas 💼</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    body{background:#0a0a0f;color:#e2e8f0;font-family:Georgia,serif;overscroll-behavior:none;}
+    select,input,button{font-family:Georgia,serif;}
+    select option{background:#1a1a2e;color:#e2e8f0;}
+    input[type=range]{-webkit-appearance:none;height:4px;border-radius:4px;background:rgba(255,255,255,0.1);outline:none;}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fbbf24;cursor:pointer;}
+    ::-webkit-scrollbar{display:none;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const CURRENT_MONTH = 2;
+const CURRENT_YEAR  = 2026;
+const INCOME = { you: { salary:24000, meal:2000, grocery:3500 } };
+const LUMPY = [
+  { label:"Fondo de ahorro (tú)",      amount:60000, month:5,  who:"you" },
+  { label:"Fondo de ahorro (ella)",    amount:44000, month:5,  who:"gf"  },
+  { label:"Bono mayo (ella)",          amount:35000, month:4,  who:"gf"  },
+  { label:"Reparto utilidades (tú)",   amount:10000, month:4,  who:"you" },
+  { label:"Reparto utilidades (ella)", amount:10000, month:4,  who:"gf"  },
+  { label:"Fondo de ahorro (tú)",      amount:60000, month:11, who:"you" },
+  { label:"Fondo de ahorro (ella)",    amount:44000, month:11, who:"gf"  },
+  { label:"Aguinaldo (tú)",            amount:44700, month:11, who:"you" },
+  { label:"Aguinaldo (ella)",          amount:20800, month:11, who:"gf"  },
+];
+const PLANNED = [
+  { label:"Cancún — hospedaje",   amount:12000,  month:3 },
+  { label:"Cancún — actividades", amount:9500,   month:3 },
+  { label:"Enganche coche",       amount:140000, month:6 },
+];
+const INIT_MSIS = [
+  { id:1, label:"Bowling Ball 1",       monthly:350,    paid:4, total:10 },
+  { id:2, label:"Bowling Ball 2",       monthly:650,    paid:2, total:5  },
+  { id:3, label:"Bowling Ball 3",       monthly:463,    paid:2, total:5  },
+  { id:4, label:"iPhone GF",            monthly:1413,   paid:6, total:21 },
+  { id:5, label:"Amazon",               monthly:118,    paid:2, total:5  },
+  { id:6, label:"Cancún Airbnb",        monthly:971.67, paid:1, total:4  },
+  { id:7, label:"Invisalign Retainers", monthly:1600,   paid:1, total:4  },
+];
+const CCS   = ["AMEX","Santander Gold","Nu","Santander AMEX","Efectivo","Vales Despensa","Vales Restaurante"];
+const CATS  = ["Comida","Gasolina","Suscripciones","MSI","Gym","Entretenimiento","Ropa","Salud","Hogar","Otro"];
+const MONTHS= ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const fmt   = n => `$${Math.round(n).toLocaleString("es-MX")}`;
+const load  = (k,d) => { try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } };
+const save  = (k,v) => { try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+
+function App() {
+  const [tab,setTab]           = useState("dashboard");
+  const [txns,setTxns]         = useState(()=>load("txns",[]));
+  const [msis,setMsis]         = useState(()=>load("msis",INIT_MSIS));
+  const [carPayment,setCarPayment] = useState(()=>load("carPayment",0));
+  useEffect(()=>save("txns",txns),[txns]);
+  useEffect(()=>save("msis",msis),[msis]);
+  useEffect(()=>save("carPayment",carPayment),[carPayment]);
+
+  const monthTxns     = txns.filter(t=>{ const d=new Date(t.date); return d.getMonth()===CURRENT_MONTH&&d.getFullYear()===CURRENT_YEAR; });
+  const monthSpend    = monthTxns.reduce((s,t)=>s+t.amount,0);
+  const msiTotal      = msis.filter(m=>m.paid<m.total).reduce((s,m)=>s+m.monthly,0);
+  const totalExpenses = monthSpend>0?monthSpend:23400;
+  const monthlyIncome = INCOME.you.salary+INCOME.you.meal+INCOME.you.grocery;
+  const monthNet      = monthlyIncome-totalExpenses;
+  const emergencyFund = 100000;
+
+  const tabs=[
+    {id:"dashboard",label:"📊",title:"Resumen"},
+    {id:"cashflow", label:"💰",title:"Flujo"},
+    {id:"msi",      label:"🔄",title:"MSIs"},
+    {id:"log",      label:"➕",title:"Registrar"},
+    {id:"txns",     label:"📋",title:"Movimientos"},
+  ];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#0a0a0f",color:"#e2e8f0",maxWidth:480,margin:"0 auto",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"20px 20px 12px",borderBottom:"1px solid rgba(255,255,255,0.06)",paddingTop:"env(safe-area-inset-top,20px)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <h1 style={{margin:0,fontSize:20,color:"#f8fafc",fontWeight:"bold"}}>Finanzas 💼</h1>
+            <p style={{margin:"2px 0 0",fontSize:12,color:"#475569"}}>{MONTHS[CURRENT_MONTH]} {CURRENT_YEAR}</p>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:22,fontWeight:"bold",color:monthNet>=0?"#22c55e":"#ef4444"}}>{fmt(monthNet)}</div>
+            <div style={{fontSize:11,color:"#475569"}}>neto este mes</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{flex:1,overflowY:"auto",padding:"16px 16px 90px"}}>
+        {tab==="dashboard"&&<Dashboard monthlyIncome={monthlyIncome} totalExpenses={totalExpenses} monthNet={monthNet} msiTotal={msiTotal} monthTxns={monthTxns} carPayment={carPayment} setCarPayment={setCarPayment} emergencyFund={emergencyFund}/>}
+        {tab==="cashflow" &&<Cashflow monthlyIncome={monthlyIncome} txns={txns}/>}
+        {tab==="msi"      &&<MSITab msis={msis} setMsis={setMsis}/>}
+        {tab==="log"      &&<LogTab txns={txns} setTxns={setTxns}/>}
+        {tab==="txns"     &&<TxnsTab txns={txns} setTxns={setTxns}/>}
+      </div>
+
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"rgba(10,10,15,0.97)",borderTop:"1px solid rgba(255,255,255,0.07)",display:"flex",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,padding:"10px 4px 8px",background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <span style={{fontSize:18}}>{t.label}</span>
+            <span style={{fontSize:9,color:tab===t.id?"#fbbf24":"#334155",fontWeight:tab===t.id?"bold":"normal"}}>{t.title}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({monthlyIncome,totalExpenses,monthNet,msiTotal,monthTxns,carPayment,setCarPayment,emergencyFund}) {
+  const cards=[
+    {label:"Ingreso mensual", value:fmt(monthlyIncome), color:"#22c55e", sub:"salario + vales"},
+    {label:"Gasto estimado",  value:fmt(totalExpenses), color:"#ef4444", sub:"este mes"},
+    {label:"MSIs activos",    value:fmt(msiTotal),      color:"#f97316", sub:"pago fijo mensual"},
+    {label:"Neto disponible", value:fmt(monthNet),      color:monthNet>=0?"#22c55e":"#ef4444", sub:"después de gastos"},
+    {label:"Fondo emergencia",value:fmt(40000),         color:"#06b6d4", sub:"meta mínima"},
+    {label:"Ahorro actual",   value:fmt(emergencyFund), color:"#a78bfa", sub:"disponible hoy"},
+  ];
+  return (
+    <div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        {cards.map((c,i)=>(
+          <div key={i} style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"14px 12px"}}>
+            <div style={{fontSize:11,color:"#475569",marginBottom:4}}>{c.label}</div>
+            <div style={{fontSize:18,fontWeight:"bold",color:c.color}}>{c.value}</div>
+            <div style={{fontSize:10,color:"#334155",marginTop:2}}>{c.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:"rgba(251,191,36,0.07)",border:"1px solid rgba(251,191,36,0.18)",borderRadius:12,padding:"14px",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <span style={{fontSize:13,color:"#fbbf24",fontWeight:"bold"}}>🚗 Pago coche (post-julio)</span>
+          <span style={{fontSize:12,color:"#64748b"}}>{fmt(carPayment)}/mes</span>
+        </div>
+        <input type="range" min={0} max={10000} step={100} value={carPayment} onChange={e=>setCarPayment(Number(e.target.value))} style={{width:"100%",accentColor:"#fbbf24"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+          <span style={{fontSize:10,color:"#334155"}}>$0</span>
+          <span style={{fontSize:10,color:"#334155"}}>$10,000</span>
+        </div>
+        {carPayment>0&&<div style={{marginTop:8,fontSize:12,color:"#94a3b8"}}>Neto post-julio: <span style={{color:monthNet-carPayment>=0?"#22c55e":"#ef4444",fontWeight:"bold"}}>{fmt(monthNet-carPayment)}</span>/mes</div>}
+      </div>
+
+      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"14px",marginBottom:16}}>
+        <div style={{fontSize:13,color:"#94a3b8",fontWeight:"bold",marginBottom:12}}>🎯 Metas de ahorro</div>
+        {[
+          {label:"Cancún",         target:21500,  current:21500,  color:"#06b6d4"},
+          {label:"Enganche coche", target:140000, current:100000, color:"#a78bfa"},
+        ].map((g,i)=>{
+          const pct=Math.min(100,Math.round((g.current/g.target)*100));
+          return (
+            <div key={i} style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:12,color:"#94a3b8"}}>{g.label}</span>
+                <span style={{fontSize:12,color:g.color}}>{pct}% — {fmt(g.current)}/{fmt(g.target)}</span>
+              </div>
+              <div style={{height:5,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:g.color,borderRadius:3}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {monthTxns.length>0&&(
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"14px"}}>
+          <div style={{fontSize:13,color:"#94a3b8",fontWeight:"bold",marginBottom:10}}>Últimos movimientos</div>
+          {monthTxns.slice(-4).reverse().map((t,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+              <div>
+                <div style={{fontSize:13,color:"#e2e8f0"}}>{t.label}</div>
+                <div style={{fontSize:10,color:"#334155"}}>{t.cat} · {t.cc}</div>
+              </div>
+              <div style={{color:"#ef4444",fontWeight:"bold",fontSize:14}}>{fmt(t.amount)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Cashflow({monthlyIncome,txns}) {
+  const [expanded,setExpanded]=useState(null);
+  const monthlyExp=23400;
+  return (
+    <div>
+      <div style={{fontSize:14,color:"#94a3b8",fontWeight:"bold",marginBottom:14}}>📅 Proyección anual 2026</div>
+      {MONTHS.map((m,idx)=>{
+        const lumpItems=LUMPY.filter(l=>l.month===idx);
+        const planItems=PLANNED.filter(p=>p.month===idx);
+        const lump=lumpItems.reduce((s,l)=>s+l.amount,0);
+        const plan=planItems.reduce((s,p)=>s+p.amount,0);
+        const carAdd=idx>=6?2800:0;
+        const income=monthlyIncome+lump;
+        const expense=monthlyExp+plan+carAdd;
+        const net=income-expense;
+        const isNow=idx===CURRENT_MONTH;
+        const isExp=expanded===idx;
+        const logged=txns.filter(t=>{const d=new Date(t.date);return d.getMonth()===idx&&d.getFullYear()===CURRENT_YEAR;}).sort((a,b)=>b.amount-a.amount);
+        return (
+          <div key={idx} style={{marginBottom:8}}>
+            <div onClick={()=>setExpanded(isExp?null:idx)}
+              style={{background:isNow?"rgba(251,191,36,0.07)":"rgba(255,255,255,0.02)",border:`1px solid ${isNow?"rgba(251,191,36,0.25)":"rgba(255,255,255,0.05)"}`,borderRadius:isExp?"10px 10px 0 0":10,padding:"12px 14px",cursor:"pointer"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:13,fontWeight:"bold",color:isNow?"#fbbf24":"#94a3b8",minWidth:28}}>{m}</span>
+                  <div>
+                    {lump>0&&<div style={{fontSize:10,color:"#22c55e"}}>+{fmt(lump)} extra</div>}
+                    {plan>0&&<div style={{fontSize:10,color:"#f97316"}}>-{fmt(plan)} planeado</div>}
+                    {carAdd>0&&<div style={{fontSize:10,color:"#a78bfa"}}>+coche ~{fmt(carAdd)}</div>}
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:14,fontWeight:"bold",color:net>=0?"#22c55e":"#ef4444"}}>{fmt(net)}</div>
+                    <div style={{fontSize:10,color:"#334155"}}>neto</div>
+                  </div>
+                  <span style={{color:"#334155",fontSize:11}}>{isExp?"▲":"▼"}</span>
+                </div>
+              </div>
+              <div style={{marginTop:8,height:4,background:"rgba(255,255,255,0.05)",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${Math.min(100,Math.round((income/(income+expense))*100))}%`,background:net>=0?"#22c55e":"#ef4444",borderRadius:2}}/>
+              </div>
+            </div>
+            {isExp&&(
+              <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderTop:"none",borderRadius:"0 0 10px 10px",padding:"12px 14px"}}>
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:11,color:"#22c55e",marginBottom:4,fontWeight:"bold"}}>📥 Ingresos</div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#94a3b8",marginBottom:2}}><span>Salario + vales</span><span>{fmt(monthlyIncome)}</span></div>
+                  {lumpItems.map((l,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#22c55e",marginBottom:2}}><span>{l.label}</span><span>+{fmt(l.amount)}</span></div>)}
+                </div>
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:11,color:"#ef4444",marginBottom:4,fontWeight:"bold"}}>📤 Gastos</div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#94a3b8",marginBottom:2}}><span>Gastos base</span><span>-{fmt(monthlyExp)}</span></div>
+                  {planItems.map((p,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#f97316",marginBottom:2}}><span>{p.label}</span><span>-{fmt(p.amount)}</span></div>)}
+                  {carAdd>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#a78bfa",marginBottom:2}}><span>Pago coche</span><span>-{fmt(carAdd)}</span></div>}
+                </div>
+                {logged.length>0&&(
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:11,color:"#6366f1",marginBottom:4,fontWeight:"bold"}}>📋 Registrado ({logged.length})</div>
+                    {logged.slice(0,5).map((t,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#64748b",marginBottom:2}}><span>{t.label}</span><span style={{color:"#ef4444"}}>{fmt(t.amount)}</span></div>)}
+                    {logged.length>5&&<div style={{fontSize:11,color:"#334155"}}>+{logged.length-5} más...</div>}
+                  </div>
+                )}
+                <div style={{paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.06)",display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:12,color:"#475569",fontWeight:"bold"}}>Neto estimado</span>
+                  <span style={{fontSize:13,fontWeight:"bold",color:net>=0?"#22c55e":"#ef4444"}}>{fmt(net)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MSITab({msis,setMsis}) {
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({label:"",monthly:"",paid:"",total:""});
+  const active=msis.filter(m=>m.paid<m.total);
+  const inactive=msis.filter(m=>m.paid>=m.total);
+  const totalMo=active.reduce((s,m)=>s+m.monthly,0);
+  const advance=id=>setMsis(prev=>prev.map(m=>m.id===id?{...m,paid:Math.min(m.paid+1,m.total)}:m));
+  const addMsi=()=>{
+    if(!form.label||!form.monthly||!form.total)return;
+    setMsis(prev=>[...prev,{id:Date.now(),label:form.label,monthly:Number(form.monthly),paid:Number(form.paid)||0,total:Number(form.total)}]);
+    setForm({label:"",monthly:"",paid:"",total:""});setShowAdd(false);
+  };
+  const iStyle={width:"100%",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"8px 10px",color:"#e2e8f0",fontSize:13,marginBottom:8,boxSizing:"border-box",fontFamily:"Georgia,serif"};
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div>
+          <div style={{fontSize:14,color:"#94a3b8",fontWeight:"bold"}}>MSIs Activos</div>
+          <div style={{fontSize:12,color:"#f97316"}}>Total mensual: {fmt(totalMo)}</div>
+        </div>
+        <button onClick={()=>setShowAdd(!showAdd)} style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",color:"#fbbf24",padding:"6px 12px",borderRadius:8,cursor:"pointer",fontSize:12}}>+ Agregar</button>
+      </div>
+      {showAdd&&(
+        <div style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:12,padding:14,marginBottom:14}}>
+          {[["label","Descripción","text"],["monthly","Pago mensual","number"],["paid","Meses pagados","number"],["total","Total de meses","number"]].map(([k,ph,type])=>(
+            <input key={k} type={type} placeholder={ph} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} style={iStyle}/>
+          ))}
+          <button onClick={addMsi} style={{width:"100%",background:"#4338ca",border:"none",borderRadius:8,padding:"9px",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:"bold"}}>Guardar MSI</button>
+        </div>
+      )}
+      {active.map(m=>{
+        const pct=Math.round((m.paid/m.total)*100);
+        const rem=m.total-m.paid;
+        return (
+          <div key={m.id} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"13px 14px",marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+              <div>
+                <div style={{fontSize:13,color:"#e2e8f0",fontWeight:"bold"}}>{m.label}</div>
+                <div style={{fontSize:11,color:"#475569"}}>{m.paid}/{m.total} meses · {rem} restantes</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:15,fontWeight:"bold",color:"#f97316"}}>{fmt(m.monthly)}/mes</div>
+                <div style={{fontSize:10,color:"#334155"}}>pendiente: {fmt(rem*m.monthly)}</div>
+              </div>
+            </div>
+            <div style={{height:5,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden",marginBottom:8}}>
+              <div style={{height:"100%",width:`${pct}%`,background:"#f97316",borderRadius:3}}/>
+            </div>
+            <button onClick={()=>advance(m.id)} style={{background:"rgba(249,115,22,0.1)",border:"1px solid rgba(249,115,22,0.2)",color:"#f97316",padding:"5px 12px",borderRadius:7,cursor:"pointer",fontSize:11}}>✓ Marcar mes pagado</button>
+          </div>
+        );
+      })}
+      {inactive.length>0&&(
+        <div style={{marginTop:16}}>
+          <div style={{fontSize:12,color:"#334155",marginBottom:8}}>✅ Liquidados</div>
+          {inactive.map(m=>(
+            <div key={m.id} style={{background:"rgba(34,197,94,0.04)",border:"1px solid rgba(34,197,94,0.1)",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:12,color:"#475569"}}>{m.label}</span>
+              <span style={{fontSize:12,color:"#22c55e"}}>✓ Pagado</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LogTab({txns,setTxns}) {
+  const today=new Date().toISOString().split("T")[0];
+  const [form,setForm]=useState({label:"",amount:"",cat:CATS[0],cc:CCS[0],who:"you",date:today});
+  const [saved,setSaved]=useState(false);
+  const submit=()=>{
+    if(!form.label||!form.amount)return;
+    setTxns(prev=>[...prev,{...form,amount:Number(form.amount),id:Date.now()}]);
+    setForm(f=>({...f,label:"",amount:""}));
+    setSaved(true);setTimeout(()=>setSaved(false),2000);
+  };
+  const inp={width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:9,padding:"10px 12px",color:"#e2e8f0",fontSize:16,boxSizing:"border-box",fontFamily:"Georgia,serif",outline:"none"};
+  const field=(lbl,content)=><div style={{marginBottom:12}}><div style={{fontSize:11,color:"#475569",marginBottom:4}}>{lbl}</div>{content}</div>;
+  return (
+    <div>
+      <div style={{fontSize:14,color:"#94a3b8",fontWeight:"bold",marginBottom:16}}>➕ Registrar gasto</div>
+      {field("Descripción",<input type="text" placeholder="Ej: Cena en restaurante" value={form.label} onChange={e=>setForm(f=>({...f,label:e.target.value}))} style={inp}/>)}
+      {field("Monto (MXN)",<input type="number" placeholder="0" inputMode="decimal" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} style={inp}/>)}
+      {field("Categoría",<select value={form.cat} onChange={e=>setForm(f=>({...f,cat:e.target.value}))} style={inp}>{CATS.map(c=><option key={c}>{c}</option>)}</select>)}
+      {field("Tarjeta / Pago",<select value={form.cc} onChange={e=>setForm(f=>({...f,cc:e.target.value}))} style={inp}>{CCS.map(c=><option key={c}>{c}</option>)}</select>)}
+      {field("¿Quién?",(
+        <div style={{display:"flex",gap:8}}>
+          {[["you","Yo"],["gf","Ella"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setForm(f=>({...f,who:v}))}
+              style={{flex:1,padding:"12px",borderRadius:9,border:`1px solid ${form.who===v?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.08)"}`,background:form.who===v?"rgba(251,191,36,0.1)":"rgba(255,255,255,0.03)",color:form.who===v?"#fbbf24":"#64748b",cursor:"pointer",fontSize:14,fontWeight:form.who===v?"bold":"normal"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      ))}
+      {field("Fecha",<input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} style={inp}/>)}
+      <button onClick={submit} style={{width:"100%",background:"linear-gradient(135deg,#4338ca,#6366f1)",border:"none",borderRadius:10,padding:"14px",color:"#fff",fontSize:16,fontWeight:"bold",cursor:"pointer",marginTop:4}}>
+        {saved?"✓ Guardado":"Registrar gasto"}
+      </button>
+    </div>
+  );
+}
+
+function TxnsTab({txns,setTxns}) {
+  const [filter,setFilter]=useState("all");
+  const sorted=[...txns].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const filtered=filter==="all"?sorted:sorted.filter(t=>t.who===filter);
+  const total=filtered.reduce((s,t)=>s+t.amount,0);
+  const del=id=>setTxns(prev=>prev.filter(t=>t.id!==id));
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:14,color:"#94a3b8",fontWeight:"bold"}}>Movimientos</div>
+        <div style={{display:"flex",gap:6}}>
+          {[["all","Todos"],["you","Yo"],["gf","Ella"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setFilter(v)}
+              style={{padding:"4px 10px",borderRadius:7,border:`1px solid ${filter===v?"rgba(251,191,36,0.4)":"rgba(255,255,255,0.08)"}`,background:filter===v?"rgba(251,191,36,0.1)":"transparent",color:filter===v?"#fbbf24":"#475569",cursor:"pointer",fontSize:11}}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.15)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",justifyContent:"space-between"}}>
+        <span style={{fontSize:13,color:"#94a3b8"}}>Total registrado</span>
+        <span style={{fontSize:15,fontWeight:"bold",color:"#ef4444"}}>{fmt(total)}</span>
+      </div>
+      {filtered.length===0&&<div style={{textAlign:"center",color:"#334155",fontSize:13,padding:"40px 0"}}>Sin movimientos.<br/>Ve a ➕ para agregar.</div>}
+      {filtered.map(t=>(
+        <div key={t.id} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"11px 14px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,color:"#e2e8f0",fontWeight:"bold"}}>{t.label}</div>
+            <div style={{fontSize:10,color:"#334155",marginTop:2}}>{t.cat} · {t.cc} · {t.who==="you"?"Yo":"Ella"} · {t.date}</div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:15,fontWeight:"bold",color:"#ef4444"}}>{fmt(t.amount)}</span>
+            <button onClick={()=>del(t.id)} style={{background:"none",border:"none",color:"#334155",cursor:"pointer",fontSize:18,padding:"2px 6px"}}>✕</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
